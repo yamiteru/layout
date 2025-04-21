@@ -1,0 +1,29 @@
+{
+  "name": "layout",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/iconv": "^3.0.4",
+    "@types/pg": "^8.11.12",
+    "drizzle-kit": "^0.30.6"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@dsnp/parquetjs": "^1.8.6",
+    "@huggingface/hub": "^1.1.2",
+    "@paralleldrive/cuid2": "^2.2.2",
+    "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.41.0",
+    "iconv": "^3.0.1",
+    "pg": "^8.14.1"
+  }
+}
