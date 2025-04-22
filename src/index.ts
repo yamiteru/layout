@@ -8,19 +8,20 @@ import { BATCH_SIZE, CHUNK_SIZE, WORKER_COUNT } from "./constants.ts";
 import LANGUAGES from "../data/languages.json";
 
 class Database {
-	static async markLanguageAsDone(language_id: string, language_name: string) {
-		await Promise.all([
-			db
-				.update(languageTable)
-				.set({ done: true })
-				.where(
-					eq(languageTable.id, language_id)
-				),
-			Huggingface.removeLanguage(language_name)
-		])
+	static async markLanguageAsDone(language_id: string) {
+		console.log("LANGUAGE DONE", language_id);
+
+		await db
+			.update(languageTable)
+			.set({ done: true })
+			.where(
+				eq(languageTable.id, language_id)
+			)
 	}
 
-	static async markFileAsDone(language_name: string, file_id: string, file_name: string) {
+	static async markFileAsDone(file_id: string) {
+		console.log("FILE DONE", file_id);
+
 		await Promise.all([
 			db
 				.update(fileTable)
@@ -33,7 +34,6 @@ class Database {
 				.where(
 					eq(chunkTable.file_id, file_id)
 				),
-			Huggingface.removeFile(language_name, file_name)
 		]);
 	}
 
@@ -144,7 +144,8 @@ class Database {
 	}
 
 	static async saveChunksWithGrams(metadata: WorkerMetadata, grams: Grams) {
-		await db
+		await db.transaction(async (tx) => {
+			await tx
 			.insert(chunkTable)
 			.values({
 				file_id: metadata.file_id,
@@ -152,102 +153,108 @@ class Database {
 			})
 			.onConflictDoNothing();
 
-		const chunk_count = await Database.getChunkCount(metadata.file_id);
+			const chunk_count = await Database.getChunkCount(metadata.file_id);
 
-		if (chunk_count === metadata.chunk_count) {
-			await Database.markFileAsDone(metadata.language_name, metadata.file_id, metadata.file_name);
+			if (chunk_count === metadata.chunk_count) {
+				await Database.markFileAsDone(metadata.file_id);
 
-			const [
-				huggingface_files,
-				database_files
-			] = await Promise.all([
-				Huggingface.getFiles(metadata.language_name),
-				Database.getFiles(metadata.language_id)
-			]);
+				const [
+					huggingface_files,
+					database_files
+				] = await Promise.all([
+						Huggingface.getFiles(metadata.language_name),
+						Database.getFiles(metadata.language_id)
+					]);
 
-			if (
-				huggingface_files.length === database_files.length &&
-				database_files.findIndex((v) => v.done === false) === -1
-			) {
-				await Database.markLanguageAsDone(metadata.language_id, metadata.language_name);
-			}
-		}
-
-		const promises: Promise<unknown>[] = [];
-
-		if (grams.unigrams.size) {
-			const values: GramInsert[] = [];
-			for (const [value, count] of grams.unigrams) {
-				values.push({ file_id: metadata.file_id, value, count });
+				if (
+					huggingface_files.length === database_files.length &&
+						database_files.findIndex((v) => v.done === false) === -1
+				) {
+					await Database.markLanguageAsDone(metadata.language_id);
+				}
 			}
 
-			for (let i = 0; i < values.length; i += BATCH_SIZE) {
-				promises.push(
-					db
-						.insert(unigramTable)
-						.values(values.slice(i, i + BATCH_SIZE))
-						.onConflictDoUpdate({
-							target: [
-								unigramTable.file_id,
-								unigramTable.value
-							],
-							set: {
-								count: sql`${unigramTable.count} + excluded.${sql.raw(unigramTable.count.name)}`
-							}
-						})
-				);
-			}
-		}
+			const promises: Promise<unknown>[] = [];
 
-		if (grams.bigrams.size) {
-			const values: GramInsert[] = [];
-			for (const [value, count] of grams.bigrams) {
-				values.push({ file_id: metadata.file_id, value, count });
-			}
+			if (grams.unigrams.size) {
+				const values: GramInsert[] = [];
+				for (const [value, count] of grams.unigrams) {
+					values.push({ file_id: metadata.file_id, value, count });
+				}
+				values.sort((a, b) => a.value.localeCompare(b.value));
 
-			for (let i = 0; i < values.length; i += BATCH_SIZE) {
-				promises.push(
-					db
-						.insert(bigramTable)
-						.values(values.slice(i, i + BATCH_SIZE))
-						.onConflictDoUpdate({
-							target: [
-								bigramTable.file_id,
-								bigramTable.value
-							],
-							set: {
-								count: sql`${bigramTable.count} + excluded.${sql.raw(bigramTable.count.name)}`
-							}
-						})
-				);
-			}
-		}
-
-		if (grams.trigrams.size) {
-			const values: GramInsert[] = [];
-			for (const [value, count] of grams.trigrams) {
-				values.push({ file_id: metadata.file_id, value, count });
+				for (let i = 0; i < values.length; i += BATCH_SIZE) {
+					promises.push(
+						tx
+							.insert(unigramTable)
+							.values(values.slice(i, i + BATCH_SIZE))
+							.onConflictDoUpdate({
+								target: [
+									unigramTable.file_id,
+									unigramTable.value
+								],
+								set: {
+									count: sql`${unigramTable.count} + excluded.${sql.raw(unigramTable.count.name)}`
+								}
+							})
+					);
+				}
 			}
 
-			for (let i = 0; i < values.length; i += BATCH_SIZE) {
-				promises.push(
-					db
-						.insert(trigramTable)
-						.values(values.slice(i, i + BATCH_SIZE))
-						.onConflictDoUpdate({
-							target: [
-								trigramTable.file_id,
-								trigramTable.value
-							],
-							set: {
-								count: sql`${trigramTable.count} + excluded.${sql.raw(trigramTable.count.name)}`
-							}
-						})
-				);
-			}
-		}
+			if (grams.bigrams.size) {
+				const values: GramInsert[] = [];
+				for (const [value, count] of grams.bigrams) {
+					values.push({ file_id: metadata.file_id, value, count });
+				}
 
-		await Promise.all(promises);
+				values.sort((a, b) => a.value.localeCompare(b.value));
+
+				for (let i = 0; i < values.length; i += BATCH_SIZE) {
+					promises.push(
+						tx
+							.insert(bigramTable)
+							.values(values.slice(i, i + BATCH_SIZE))
+							.onConflictDoUpdate({
+								target: [
+									bigramTable.file_id,
+									bigramTable.value
+								],
+								set: {
+									count: sql`${bigramTable.count} + excluded.${sql.raw(bigramTable.count.name)}`
+								}
+							})
+					);
+				}
+			}
+
+			if (grams.trigrams.size) {
+				const values: GramInsert[] = [];
+				for (const [value, count] of grams.trigrams) {
+					values.push({ file_id: metadata.file_id, value, count });
+				}
+
+				values.sort((a, b) => a.value.localeCompare(b.value));
+
+				for (let i = 0; i < values.length; i += BATCH_SIZE) {
+					promises.push(
+						tx
+							.insert(trigramTable)
+							.values(values.slice(i, i + BATCH_SIZE))
+							.onConflictDoUpdate({
+								target: [
+									trigramTable.file_id,
+									trigramTable.value
+								],
+								set: {
+									count: sql`${trigramTable.count} + excluded.${sql.raw(trigramTable.count.name)}`
+								}
+							})
+					);
+				}
+			}
+
+			await Promise.all(promises);
+		});
 	}
 }
 
@@ -276,14 +283,6 @@ class Huggingface {
 	}
 
 	static async downloadFile(language_name: string, file_name: string) {
-		const file = Bun.file(`cache/${language_name}/${file_name}`);
-
-		if (await file.exists()) {
-			return Buffer.from(
-				await file.arrayBuffer()
-			);
-		}
-
 		const response = await downloadFile({
 			repo: process.env.HUGGINGFACE_REPO!,
 			accessToken: process.env.HUGGINGFACE_TOKEN,
@@ -292,25 +291,7 @@ class Huggingface {
 
 		const array_buffer = await response!.arrayBuffer();
 
-		await file.write(array_buffer);
-
 		return Buffer.from(array_buffer);
-	}
-
-	static async removeFile(language_name: string, file_name: string) {
-		const file = Bun.file(`cache/${language_name}/${file_name}`);
-
-		if (await file.exists()) {
-			await file.delete();
-		}
-	}
-
-	static async removeLanguage(language_name: string) {
-		const file = Bun.file(`cache/${language_name}/`);
-
-		if (await file.exists()) {
-			await file.delete();
-		}
 	}
 }
 
@@ -351,7 +332,7 @@ async function* createDataLoader() {
 			huggingface_files.length === database_files.length &&
 			database_files.findIndex((v) => v.done === false) === -1
 		) {
-			await Database.markLanguageAsDone(language.id, language.name);
+			await Database.markLanguageAsDone(language.id);
 			continue;
 		}
 
@@ -364,6 +345,8 @@ async function* createDataLoader() {
 				continue;
 			}
 
+			console.log("DOWNLOAD", language.name, file.name);
+
 			const [chunks, file_buffer] = await Promise.all([
 				Database.getChunks(file.id),
 				Huggingface.downloadFile(language.name, file.name)
@@ -374,7 +357,7 @@ async function* createDataLoader() {
 			const chunk_count = Math.ceil(row_count / CHUNK_SIZE);
 
 			if (chunks.length === chunk_count) {
-				await Database.markFileAsDone(language.name, file.id, file.name);
+				await Database.markFileAsDone(file.id);
 				continue;
 			}
 
@@ -397,14 +380,14 @@ async function* createDataLoader() {
 
 				const next_offset = offset + BigInt(records.length);
 
-				if (records.length && chunks.findIndex((v) => v.offset === offset)) {
+				if (records.length && chunks.findIndex((v) => v.offset === offset) === -1) {
 					yield {
 						metadata: {
 							language_id: language.id,
 							language_name: language.name,
 							file_id: file.id,
 							file_name: file.name,
-							chunk_count: row_count,
+							chunk_count: chunk_count,
 							chunk_offset: offset,
 						},
 						records
@@ -445,6 +428,8 @@ while (await Database.isEverythingDone() === false) {
 		worker.addEventListener("message", async (event) => {
 			const grams = event.data as WorkerOutput;
 			const metadata = worker_metadata[i]!;
+
+			console.log("CHUNK DONE", metadata.language_name, metadata.file_name, metadata.chunk_offset, metadata.chunk_count * CHUNK_SIZE);
 
 			await Database.saveChunksWithGrams(metadata, grams);
 			await next(i);
