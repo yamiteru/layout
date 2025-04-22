@@ -7,8 +7,8 @@ CREATE TABLE "bigram" (
 --> statement-breakpoint
 CREATE TABLE "chunk" (
 	"file_id" uuid NOT NULL,
-	"index" bigint NOT NULL,
-	CONSTRAINT "chunk_file_id_index_pk" PRIMARY KEY("file_id","index")
+	"offset" bigint NOT NULL,
+	CONSTRAINT "chunk_file_id_offset_pk" PRIMARY KEY("file_id","offset")
 );
 --> statement-breakpoint
 CREATE TABLE "file" (

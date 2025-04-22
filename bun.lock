@@ -6,7 +6,6 @@
       "dependencies": {
         "@dsnp/parquetjs": "^1.8.6",
         "@huggingface/hub": "^1.1.2",
-        "@paralleldrive/cuid2": "^2.2.2",
         "dotenv": "^16.5.0",
         "drizzle-orm": "^0.41.0",
         "iconv": "^3.0.1",
@@ -157,10 +156,6 @@
     "@huggingface/hub": ["@huggingface/hub@1.1.2", "", { "dependencies": { "@huggingface/tasks": "^0.18.2" } }, "sha512-Jf4GhvVj9ABDw4Itb3BV1T7f22iewuZva476qTicQ4kOTbosuUuFDhsVH7ZH6rVNgg20Ll9kaNBF5CXjySIT+w=="],
 
     "@huggingface/tasks": ["@huggingface/tasks@0.18.7", "", {}, "sha512-ZzwifnFo4onuIs7cIzm/1G8MFZPQeMhQplG/Ru5Xnnm4TDwxrtThHfhrCZrdS8vEKpy+XBH9INoNelnWox8UQQ=="],
-
-    "@noble/hashes": ["@noble/hashes@1.7.1", "", {}, "sha512-B8XBPsn4vT/KJAGqDzbwztd+6Yte3P4V7iafm24bxgDe/mlRuK6xmWPuCNrKt2vDafZ8MfJLlchDG/vYafQEjQ=="],
-
-    "@paralleldrive/cuid2": ["@paralleldrive/cuid2@2.2.2", "", { "dependencies": { "@noble/hashes": "^1.1.5" } }, "sha512-ZOBkgDwEdoYVlSeRbYYXs0S9MejQofiVYoTbKzy/6GQa39/q5tQU2IX46+shYnUkpEl3wc+J6wRlar7r2EK2xA=="],
 
     "@petamoriken/float16": ["@petamoriken/float16@3.9.2", "", {}, "sha512-VgffxawQde93xKxT3qap3OH+meZf7VaSB5Sqd4Rqc+FP5alWbpOyan/7tRbOAvynjpG3GpdtAuGU/NdhQpmrog=="],
 

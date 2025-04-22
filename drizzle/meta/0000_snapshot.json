@@ -1,5 +1,5 @@
 {
-  "id": "2390f723-3375-4b7e-92eb-287d4575d355",
+  "id": "e1278601-bc11-49cf-b6c9-700ca2d46446",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -67,8 +67,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "index": {
-          "name": "index",
+        "offset": {
+          "name": "offset",
           "type": "bigint",
           "primaryKey": false,
           "notNull": true
@@ -91,11 +91,11 @@
         }
       },
       "compositePrimaryKeys": {
-        "chunk_file_id_index_pk": {
-          "name": "chunk_file_id_index_pk",
+        "chunk_file_id_offset_pk": {
+          "name": "chunk_file_id_offset_pk",
           "columns": [
             "file_id",
-            "index"
+            "offset"
           ]
         }
       },
